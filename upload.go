@@ -6,13 +6,15 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/nfnt/resize"
 )
+
+var extMap map[string]int
 
 // UploadFile function is a simple helper function that uploads and saves an image on the server
 // Params:
@@ -21,16 +23,14 @@ import (
 // ID: unique string ID for the image
 // size: to resize the image, the function will keep the aspect ratio intact
 func UploadFile(r *http.Request, location string, ID string, size uint) (string, error) {
+	initExtMap()
 	var path string
 	file, hdr, err := r.FormFile("get_picture")
 	if err != nil {
 		return path, nil
 	}
 
-	ext := string(hdr.Filename[len(hdr.Filename)-3:])
-	if _, err := checkFileExtension(ext); err != nil {
-		return "", err
-	}
+	ext := getExt(hdr.Filename)
 	defer file.Close()
 
 	path, err = saveFile(file, location, ID, ext, size)
@@ -39,27 +39,6 @@ func UploadFile(r *http.Request, location string, ID string, size uint) (string,
 	}
 
 	return path, nil
-}
-
-// CheckFileExtension function checks whether the uploaded file is an image or not
-func checkFileExtension(ext string) (int8, error) {
-	switch ext {
-	case "jpg":
-		fallthrough
-	case "JPG":
-		return JPG, nil
-	case "png":
-		fallthrough
-	case "PNG":
-		return PNG, nil
-	case "gif":
-		fallthrough
-	case "GIF":
-		return GIF, nil
-	default:
-		log.Println("File is NOT an image")
-		return 0, errors.New("File is NOT an image")
-	}
 }
 
 // SaveFile function helps in uploading the profile picture of user
@@ -76,8 +55,7 @@ func saveFile(src multipart.File, location, id, ext string, size uint) (string, 
 	}
 	defer dst.Close()
 
-	e, _ := checkFileExtension(ext)
-	switch e {
+	switch extMap[ext] {
 	case JPG:
 		img, err = decodeJPG(src, size)
 		if err != nil {
@@ -93,6 +71,8 @@ func saveFile(src multipart.File, location, id, ext string, size uint) (string, 
 		if err != nil {
 			return "", err
 		}
+	default:
+		return "", errors.New("File is not an image")
 	}
 
 	if err := jpeg.Encode(dst, img, &op); err != nil {
@@ -122,4 +102,36 @@ func decodeGIF(src multipart.File, size uint) (image.Image, error) {
 	img, err := gif.Decode(src)
 	img = resize.Resize(size, 0, img, resize.Lanczos3)
 	return img, err
+}
+
+func initExtMap() {
+	extMap = make(map[string]int)
+
+	extMap["jpeg"] = JPG
+	extMap["jpg"] = JPG
+	extMap["JPG"] = JPG
+	extMap["JPEG"] = JPG
+
+	extMap["png"] = PNG
+	extMap["PNG"] = PNG
+
+	extMap["gif"] = GIF
+	extMap["GIF"] = GIF
+}
+
+func getExt(filename string) string {
+	revName := reverse(filename)
+	revExt := strings.Split(revName, ".")[0]
+	return reverse(revExt)
+}
+
+func reverse(txt string) string {
+	data := []rune(txt)
+	var result []rune
+
+	for i := len(data) - 1; i >= 0; i-- {
+		result = append(result, data[i])
+	}
+
+	return string(result)
 }
