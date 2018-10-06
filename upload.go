@@ -55,7 +55,12 @@ func saveFile(src multipart.File, location, id, ext string, size uint) (string, 
 	}
 	defer dst.Close()
 
-	switch extMap[ext] {
+	extNum, ok := extMap[ext]
+	if ok == false {
+		return "", errors.New("File is not an image")
+	}
+
+	switch extNum {
 	case JPG:
 		img, err = decodeJPG(src, size)
 		if err != nil {
