@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/nfnt/resize"
+	filetype "gopkg.in/h2non/filetype.v1"
 )
 
 var extMap map[string]int
@@ -30,7 +31,13 @@ func UploadFile(r *http.Request, location string, ID string, size uint) (string,
 		return path, nil
 	}
 
+	err = isImage(file)
+	if err != nil {
+		return "", err
+	}
+
 	ext := getExt(hdr.Filename)
+
 	defer file.Close()
 
 	path, err = saveFile(file, location, ID, ext, size)
@@ -128,6 +135,16 @@ func getExt(filename string) string {
 	revName := reverse(filename)
 	revExt := strings.Split(revName, ".")[0]
 	return reverse(revExt)
+}
+
+func isImage(file multipart.File) error {
+	head := make([]byte, 261)
+	file.Read(head)
+
+	if filetype.IsImage(head) {
+		return nil
+	}
+	return errors.New("Not an image")
 }
 
 func reverse(txt string) string {
